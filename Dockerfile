@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm install
 
 # Copy application files
-COPY database.js app.js .env ./
+COPY database.js app.js 
 
 # The .dockerignore should be created before building, not during
 # Remove these lines:
