@@ -1,25 +1,21 @@
-# Use Node 22.11.0 as the base image
-FROM node:22.11.0
+FROM node:22-slim
 
-# Create and set working directory
 WORKDIR /app
 
-# Copy package files first (for better caching)
+# Copy package files
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy application code
-COPY api.js database.js ./
-COPY .env ./
+# Copy application files
+COPY database.js app.js .env ./
 
-# Don't copy unnecessary files
-COPY .dockerignore ./
-RUN echo "node_modules\n.git\n.gitignore\nnpm-debug.log" > .dockerignore
+# The .dockerignore should be created before building, not during
+# Remove these lines:
+# COPY .dockerignore ./
+# RUN echo "node_modules\n.git\n.gitignore\nnpm-debug.log" > .dockerignore
 
-# Expose the port your app runs on
 EXPOSE 3000
 
-# Start the application
-CMD ["node", "api.js"]
+CMD ["node", "app.js"]
