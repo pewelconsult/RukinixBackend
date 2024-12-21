@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCategories, addProduct, getAllProducts } = require('./database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
