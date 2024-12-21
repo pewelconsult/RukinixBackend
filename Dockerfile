@@ -1,20 +1,25 @@
-# Use Node 22 image
-FROM node:22
+# Use Node 22.11.0 as the base image
+FROM node:22.11.0
 
-# Create app directory in container
-WORKDIR /usr/src/app
+# Create and set working directory
+WORKDIR /app
 
-# Copy package files first for better caching
+# Copy package files first (for better caching)
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy the rest of your application code
-COPY . .
+# Copy application code
+COPY api.js database.js ./
+COPY .env ./
 
-# Define the port number the container should expose
+# Don't copy unnecessary files
+COPY .dockerignore ./
+RUN echo "node_modules\n.git\n.gitignore\nnpm-debug.log" > .dockerignore
+
+# Expose the port your app runs on
 EXPOSE 3000
 
-# Command to run your application
-CMD [ "node", "api.js" ]
+# Start the application
+CMD ["node", "api.js"]

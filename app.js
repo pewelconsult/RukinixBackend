@@ -21,6 +21,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
+
+// Define a GET route
+app.get('/', (req, res) => {
+  res.send('Hello, World!');
+});
+
 // Route to add a company
 app.post('/add-company', async (req, res) => {
     const { name, contact, code } = req.body;
