@@ -4,10 +4,11 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
 const bcrypt = require('bcrypt');
 const app = express();
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 
 
-const mySecretKey = "123465757484839391"
+const mySecretKey =  process.env.SECRET_KEY
 
 
 async function func1 (){
