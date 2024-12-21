@@ -8,8 +8,8 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy application files
-COPY database.js app.js 
+# Copy application files - adjust these paths based on your actual structure
+COPY . .
 
 EXPOSE 3000
 
