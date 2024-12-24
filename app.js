@@ -74,7 +74,7 @@ const upload = multer({
 
 // Define a GET route
 app.get('/', (req, res) => {
-  res.send('Hello, World!');
+  res.send('Hello, Sir Newton!');
 });
 
 
