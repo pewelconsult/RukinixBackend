@@ -157,7 +157,6 @@ async function addCategory(data, companyId) {
     const collectionPath = `${companyId}/CATEGORIES/data`;
     try {
       data.createOn = new Date();
-      data.createdBy = 'Newton Kumi';
       await db.collection(collectionPath).add(data);
       return true;
     } catch (error) {
@@ -177,6 +176,204 @@ async function addCategory(data, companyId) {
       throw error;
     }
   }
+
+
+
+  async function checkProductAlreadyExists(companyId, productName) {
+    const collectionPath = `${companyId}/PRODUCTS/data`;
+    const lowerCaseProductName = productName.toLowerCase().trim();
+    
+    const snapshot = await db.collection(collectionPath).get();
+    
+    const exists = snapshot.docs.some(doc => {
+        const docData = doc.data();
+        if (!docData || !docData.itemName) return false;
+        return docData.itemName.toLowerCase().trim() === lowerCaseProductName;
+    });
+    
+    return { exists, snapshot };
+}
+
+
+
+// Add this function to your backend
+async function updateProduct(company, productId, data) {
+  const collectionPath = `${company}/PRODUCTS/data`;
+  try {
+    await db.collection(collectionPath).doc(productId).update({
+      ...data,
+      updatedOn: new Date(),
+    });
+    return true;
+  } catch (error) {
+    console.error("Error updating product:", error);
+    throw error;
+  }
+}
+
+
+
+async function deleteProduct(company, productId) {
+  const collectionPath = `${company}/PRODUCTS/data`;
+  try {
+    await db.collection(collectionPath).doc(productId).delete();
+    return true;
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    throw error;
+  }
+}
+
+
+
+
+
+  async function checkCategoryAlreadyExist(companyId, categoryName) {
+    // Check if category exists
+    const collectionPath = `${companyId}/CATEGORIES/data`;
+    const lowerCaseCategoryName = categoryName.toLowerCase().trim();
+    
+    const snapshot = await db.collection(collectionPath).get();
+    
+    // Check if any existing category matches (case-insensitive)
+    const exists = snapshot.docs.some(doc => {
+        const existingCategory = doc.data().categoryName;
+        return existingCategory.toLowerCase().trim() === lowerCaseCategoryName;
+    });
+    
+    return {
+        exists,
+        snapshot
+    };
+}
+
+
+
+
+
+  async function addSalesData(data, company) {
+    const collectionPath = `${company}/SALES/data`;
+    try {
+      data.createOn = new Date();
+      await db.collection(collectionPath).add(data);
+      return true;
+    } catch (error) {
+      console.error("Error adding category:", error);
+      throw error;
+    }
+  }
+
+
+
+
+
+// Update product quantities function
+async function updateProductQuantities(items, companyId) {
+  const batch = db.batch();
+  const productsRef = db.collection(`${companyId}/PRODUCTS/data`);
+  const updateErrors = [];
+
+  try {
+    // Get all products that need updating
+    const productUpdates = await Promise.all(
+      items.map(async (item) => {
+        const productDoc = await productsRef.doc(item.id).get();
+        if (!productDoc.exists) {
+          updateErrors.push(`Product not found: ${item.itemName}`);
+          return null;
+        }
+
+        const currentQuantity = productDoc.data().quantity || 0;
+        if (currentQuantity < item.quantity) {
+          updateErrors.push(`Insufficient stock for ${item.itemName}. Available: ${currentQuantity}`);
+          return null;
+        }
+
+        return {
+          ref: productDoc.ref,
+          newQuantity: currentQuantity - item.quantity
+        };
+      })
+    );
+
+    // If any errors occurred, throw them
+    if (updateErrors.length > 0) {
+      throw new Error(updateErrors.join(', '));
+    }
+
+    // Add all updates to batch
+    productUpdates.forEach(update => {
+      if (update) {
+        batch.update(update.ref, { quantity: update.newQuantity });
+      }
+    });
+
+    // Commit the batch
+    await batch.commit();
+    return true;
+
+  } catch (error) {
+    console.error("Error updating product quantities:", error);
+    throw error;
+  }
+}
+
+// Sales route implementation
+async function processAndAddSale(saleData, companyId) {
+  try {
+    // First update product quantities
+    await updateProductQuantities(saleData.items, companyId);
+    
+    // If quantity update succeeds, add the sale
+    const saleResult = await addSalesData(saleData, companyId);
+    return saleResult;
+
+  } catch (error) {
+    console.error("Error processing sale:", error);
+    throw error;
+  }
+}
+
+
+
+// Function to get all sales
+async function getAllSales(company, startDate = null, endDate = null) {
+  const collectionPath = `${company}/SALES/data`;
+  try {
+    let query = db.collection(collectionPath);
+
+    // Add date filtering if dates are provided
+    if (startDate && endDate) {
+      query = query.where('createOn', '>=', new Date(startDate))
+                  .where('createOn', '<=', new Date(endDate));
+    }
+
+    // Order by creation date, newest first
+    query = query.orderBy('createOn', 'desc');
+
+    const snapshot = await query.get();
+    const sales = [];
+
+    snapshot.forEach(doc => {
+      sales.push({
+        id: doc.id,
+        ...doc.data(),
+        // Convert Firestore Timestamp to JavaScript Date
+        createOn: doc.data().createOn.toDate()
+      });
+    });
+
+    return sales;
+
+  } catch (error) {
+    console.error("Error getting sales:", error);
+    throw error;
+  }
+}
+
+
+
+
 
 async function addUserSessionData(data) {
   await db.collection('userSessions').add(data);
@@ -273,6 +470,12 @@ module.exports = {
     updateCompany,
     getUserLoginHistory,
     addUserSessionData,
-    getAllUsers
+    getAllUsers,
+    processAndAddSale,
+    getAllSales,
+    checkCategoryAlreadyExist,
+    checkProductAlreadyExists,
+    deleteProduct,
+    updateProduct
 };
 

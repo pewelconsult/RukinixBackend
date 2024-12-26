@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCategories, addProduct, 
   getAllProducts, getAllCompanies, getCompanyById, deleteCompany, updateCompany, addUserSessionData,
-  getUserLoginHistory, getAllUsers } = require('./database');
+  getUserLoginHistory, getAllUsers, processAndAddSale, getAllSales, checkCategoryAlreadyExist,
+  checkProductAlreadyExists, deleteProduct, updateProduct} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -189,32 +190,46 @@ app.post('/register', async (req, res) => {
 
 
 app.post('/add-category', authenticateUser, async (req, res) => {
-  console.log("This has been called- add categories has been called")
+  console.log("This has been called- add categories has been called");
   try {
-    const categoryName = req.body.category;
-    const newCategory = {
-      categoryName: categoryName,
-      createdAt: new Date(),
-    };
-    const companyId = req.user.companyId;
-    
-    // Save to database
-    await addCategory(newCategory, companyId);
+      const categoryName = req.body.category;
+      const companyId = req.user.companyId;
+      
 
-    res.status(201).json({
-      success: true,
-      message: 'Category added successfully',
-      category: newCategory
-    });
+      // Check if category exists
+      snapshot = await checkCategoryAlreadyExist(companyId, categoryName)
+    
+
+      if (snapshot.exists) {
+          return res.status(400).json({
+              success: false,
+              message: 'Category already exists'
+          });
+      }
+
+      // If category doesn't exist, proceed to add it
+      const newCategory = {
+          categoryName: categoryName,
+          createdAt: new Date(),
+      };
+
+      await addCategory(newCategory, companyId);
+
+      res.status(201).json({
+          success: true,
+          message: 'Category added successfully',
+          category: newCategory
+      });
 
   } catch (error) {
-    console.error('Error adding category:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred while adding the category'
-    });
+      console.error('Error adding category:', error);
+      res.status(500).json({
+          success: false,
+          message: 'An error occurred while adding the category'
+      });
   }
 });
+
 
 
 
@@ -232,6 +247,122 @@ app.delete('/delete-company/:id', async (req, res) => {
         }
     }
 });
+
+
+
+// Add this endpoint to your Express app
+app.put('/update-product/:productId', authenticateUser, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const company = req.user.companyId;
+    const updateData = req.body;
+
+    await updateProduct(company, productId, updateData);
+    res.status(200).json({ message: 'Product updated successfully' });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+
+
+
+app.delete('/delete-product/:productId', authenticateUser, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const company = req.user.companyId;
+
+    await deleteProduct(company, productId);
+    res.status(200).json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
+
+// Express route
+app.post('/make-sales', authenticateUser, async (req, res) => {
+  try {
+    const saleData = {
+      items: req.body.items,
+      total: req.body.total,
+      amountPaid: req.body.amountPaid,
+      change: req.body.change,
+      paymentMode: req.body.paymentMode,
+      customerName: req.body.customerName,
+      createdBy: req.user.email 
+    };
+    
+    const companyId = req.user.companyId;
+    
+    // Process the sale
+    await processAndAddSale(saleData, companyId);
+
+    res.status(201).json({
+      success: true,
+      message: 'Sale processed successfully'
+    });
+
+  } catch (error) {
+    console.error('Error processing sale:', error);
+    
+    // Handle specific errors
+    if (error.message.includes('Product not found') || 
+        error.message.includes('Insufficient stock')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    // Handle generic errors
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while processing the sale'
+    });
+  }
+});
+
+
+
+// Express route for getting sales
+app.get('/sales', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    const { startDate, endDate } = req.query;
+
+    const sales = await getAllSales(companyId, startDate, endDate);
+
+    // Calculate some basic statistics
+    const totalSales = sales.length;
+    const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+    const salesByPaymentMode = sales.reduce((acc, sale) => {
+      acc[sale.paymentMode] = (acc[sale.paymentMode] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.status(200).json({
+      success: true,
+      data: {
+        sales,
+        summary: {
+          totalSales,
+          totalRevenue,
+          salesByPaymentMode
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching sales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching sales data'
+    });
+  }
+});
+
 
 
 app.post('/login', async (req, res) => {
@@ -320,20 +451,27 @@ app.get("/categories", authenticateUser, async (req, res) => {
   });
 
 
-app.post('/add-products', authenticateUser, async (req, res) => {
+  app.post('/add-products', authenticateUser, async (req, res) => {
     try {
-      const productData = req.body; 
-      company = req.user.companyId
-      productData.createdBy = req.user.email;
-      console.log(req.user)
-      await addProduct(productData, company)
-      res.status(201).json(productData);
+        const { itemName } = req.body;
+        const company = req.user.companyId;
+        const { exists } = await checkProductAlreadyExists(company, itemName);
+        if (exists) {
+            return res.status(400).json({ error: 'Product already exists' });
+        }
+        
+        const productData = {
+            ...req.body,
+            createdBy: req.user.email
+        };
+        
+        await addProduct(productData, company);
+        res.status(201).json(productData);
     } catch (error) {
-      console.error('Error creating product:', error);
-      res.status(500).json({ error: 'Failed to create product' });
+        console.error('Error creating product:', error);
+        res.status(500).json({ error: 'Failed to create product' });
     }
-  });
-
+});
 
 
 app.get("/products", authenticateUser, async (req, res) => {
@@ -353,6 +491,8 @@ app.get("/products", authenticateUser, async (req, res) => {
     }
   });
 
+
+  
 
   // Get all active users
   /*
