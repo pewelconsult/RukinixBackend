@@ -378,6 +378,7 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    const expiresIn = "5h"
     // Include important user data in token
     const token = jwt.sign({ 
       email: user1.email,
@@ -385,7 +386,7 @@ app.post('/login', async (req, res) => {
       role: user1.role,
       companyId: user1.companyId
     }, mySecretKey, { 
-      expiresIn: '1h' 
+      expiresIn: expiresIn
     });
 
     // Log the session in Firestore
@@ -405,7 +406,8 @@ app.post('/login', async (req, res) => {
       }
     };
     await addUserSessionData(data)
-    res.json({ message: 'Login successful', token });
+    res.json({ message: 'Login successful', token , token_expiry: expiresIn, 
+      userRole: user1.role, companyName: user1.companyId});
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
