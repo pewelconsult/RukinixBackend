@@ -506,7 +506,7 @@ async function getUserByEmail(email) {
 
 // Function to get user by ID
 async function getUserById(userId) {
-    const collectionName = `${COMPANY_NAME}/USERS/data`;
+    const collectionName = `/USERS`;
     const docRef = db.collection(collectionName).doc(userId);
 
     const doc = await docRef.get();
