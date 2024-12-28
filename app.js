@@ -294,7 +294,6 @@ app.post('/make-sales', authenticateUser, async (req, res) => {
     };
     
     const companyId = req.user.companyId;
-    
     // Process the sale
     await processAndAddSale(saleData, companyId);
 
