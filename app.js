@@ -3,7 +3,8 @@ const cors = require('cors');
 const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCategories, addProduct, 
   getAllProducts, getAllCompanies, getCompanyById, deleteCompany, updateCompany, addUserSessionData,
   getUserLoginHistory, getAllUsers, processAndAddSale, getAllSales, checkCategoryAlreadyExist,
-  checkProductAlreadyExists, deleteProduct, updateProduct} = require('./database');
+  checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
+  getCompanyByName, } = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -17,11 +18,6 @@ require('dotenv').config();
 
 const mySecretKey =  process.env.SECRET_KEY
 
-
-async function func1 (){
-    user1 = await getAllProducts()
-    console.log(user1)
-}
 
 
 // Middleware
@@ -80,7 +76,7 @@ app.get('/', (req, res) => {
 
 
 // Route to handle company creation
-app.post('/add-company', upload.single('companyLogo'), async (req, res) => {
+app.post('/add-company',authenticateUser, upload.single('companyLogo'), async (req, res) => {
   try {
     const {
       companyName, contactPersonName, contactPersonPhone, companyEmail, subscriptionPlan, address,
@@ -93,6 +89,7 @@ app.post('/add-company', upload.single('companyLogo'), async (req, res) => {
     };
 
     // Save to database
+    company.createdBy = req.user.email
     await addCompany(company)
 
     res.status(201).json({
@@ -100,34 +97,43 @@ app.post('/add-company', upload.single('companyLogo'), async (req, res) => {
       company,
     });
   } catch (error) {
-    console.error('Error adding company:', error);
     res.status(500).json({ message: 'An error occurred while adding the company.' });
   }
 });
 
 
-app.get('/companies', async (req, res) => {
+app.get('/companies',authenticateUser, async (req, res) => {
   try {
     const companies = await getAllCompanies();
     res.status(200).json(companies);
   } catch (error) {
-    console.error('Error fetching companies:', error);
     res.status(500).json({ message: 'An error occurred while fetching companies.' });
   }
 });
 
 // Route to get a company by ID
-app.get('/companies/:id', async (req, res) => {
+app.get('/companies/:id',authenticateUser, async (req, res) => {
   try {
     const company = await getCompanyById(req.params.id);
     res.status(200).json(company);
   } catch (error) {
-    console.error('Error fetching company:', error);
     res.status(404).json({ message: error.message });
   }
 });
 
-app.post('/update-company', async (req, res) => {
+
+app.get('/companies/name/:name',authenticateUser, async (req, res) => {
+  try {
+    const company = await getCompanyByName(req.params.name);
+    res.status(200).json(company);
+  } catch (error) {
+    res.status(404).json({ message: error.message });
+  }
+});
+
+
+
+app.post('/update-company', authenticateUser, async (req, res) => {
   try {
       const result = await updateCompany(req.body);
       if (result) {
@@ -136,14 +142,13 @@ app.post('/update-company', async (req, res) => {
           res.status(404).json({ message: 'Company not found' });
       }
   } catch (error) {
-      console.error('Error updating company:', error);
       res.status(500).json({ message: 'Error updating company', error: error.message });
   }
 });
 
 
 // Route to register a user
-app.post('/register', async (req, res) => {
+app.post('/register', authenticateUser, async (req, res) => {
   try {
       let userData = {
           fullName: req.body.fullName,
@@ -176,8 +181,6 @@ app.post('/register', async (req, res) => {
       }
 
   } catch (error) {
-      console.error('Registration error:', error);
-
       res.status(500).json({
           error: 'Error registering user',
           details: error.message
@@ -190,7 +193,6 @@ app.post('/register', async (req, res) => {
 
 
 app.post('/add-category', authenticateUser, async (req, res) => {
-  console.log("This has been called- add categories has been called");
   try {
       const categoryName = req.body.category;
       const companyId = req.user.companyId;
@@ -222,7 +224,6 @@ app.post('/add-category', authenticateUser, async (req, res) => {
       });
 
   } catch (error) {
-      console.error('Error adding category:', error);
       res.status(500).json({
           success: false,
           message: 'An error occurred while adding the category'
@@ -233,7 +234,7 @@ app.post('/add-category', authenticateUser, async (req, res) => {
 
 
 
-app.delete('/delete-company/:id', async (req, res) => {
+app.delete('/delete-company/:id', authenticateUser, async (req, res) => {
     try {
         const companyId = req.params.id;
         await deleteCompany(companyId);
@@ -242,7 +243,6 @@ app.delete('/delete-company/:id', async (req, res) => {
         if (error.message === 'Company not found') {
             res.status(404).json({ error: 'Company not found' });
         } else {
-            console.error('Error in delete company route:', error);
             res.status(500).json({ error: 'Failed to delete company' });
         }
     }
@@ -260,7 +260,6 @@ app.put('/update-product/:productId', authenticateUser, async (req, res) => {
     await updateProduct(company, productId, updateData);
     res.status(200).json({ message: 'Product updated successfully' });
   } catch (error) {
-    console.error('Error updating product:', error);
     res.status(500).json({ error: 'Failed to update product' });
   }
 });
@@ -276,7 +275,6 @@ app.delete('/delete-product/:productId', authenticateUser, async (req, res) => {
     await deleteProduct(company, productId);
     res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
-    console.error('Error deleting product:', error);
     res.status(500).json({ error: 'Failed to delete product' });
   }
 });
@@ -306,8 +304,6 @@ app.post('/make-sales', authenticateUser, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error processing sale:', error);
-    
     // Handle specific errors
     if (error.message.includes('Product not found') || 
         error.message.includes('Insufficient stock')) {
@@ -355,7 +351,6 @@ app.get('/sales', authenticateUser, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching sales:', error);
     res.status(500).json({
       success: false,
       message: 'An error occurred while fetching sales data'
@@ -409,14 +404,13 @@ app.post('/login', async (req, res) => {
     res.json({ message: 'Login successful', token , token_expiry: expiresIn, 
       userRole: user1.role, companyName: user1.companyId});
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
 
 
-app.get('/users', async (req, res) => {
+app.get('/users', authenticateUser, async (req, res) => {
   try {
       const users = await getAllUsers(); // Call the function to get all users
       res.status(200).json({
@@ -444,7 +438,6 @@ app.get("/categories", authenticateUser, async (req, res) => {
         data: categories,
       });
     } catch (error) {
-      console.error("Error fetching categories:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch categories. Please try again later.",
@@ -453,7 +446,7 @@ app.get("/categories", authenticateUser, async (req, res) => {
   });
 
 
-  app.post('/add-products', authenticateUser, async (req, res) => {
+app.post('/add-products', authenticateUser, async (req, res) => {
     try {
         const { itemName } = req.body;
         const company = req.user.companyId;
@@ -470,10 +463,56 @@ app.get("/categories", authenticateUser, async (req, res) => {
         await addProduct(productData, company);
         res.status(201).json(productData);
     } catch (error) {
-        console.error('Error creating product:', error);
         res.status(500).json({ error: 'Failed to create product' });
     }
 });
+
+
+
+
+app.post('/add-supplier', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId; // Assuming you have middleware that adds user info
+    const supplierData = req.body;
+    supplierData.createdBy = req.user.email
+    await addSupplier(supplierData, companyId);
+    res.status(200).json({
+      success: true,
+      message: 'Supplier added successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add supplier',
+      error: error.message
+    });
+  }
+});
+
+
+
+
+app.get('/suppliers', authenticateUser, async (req, res) => {
+  try {
+      const companyId = req.user.companyId; // From auth middleware
+      const suppliers = await getAllSuppliers(companyId);
+      
+      res.status(200).json({
+          success: true,
+          data: suppliers,
+          total: suppliers.length
+      });
+
+  } catch (error) {
+      res.status(500).json({
+          success: false,
+          message: 'Failed to fetch suppliers',
+          error: error.message
+      });
+  }
+});
+
+
 
 
 app.get("/products", authenticateUser, async (req, res) => {
@@ -485,7 +524,6 @@ app.get("/products", authenticateUser, async (req, res) => {
         data: products,
       });
     } catch (error) {
-      console.error("Error fetching categories:", error);
       res.status(500).json({
         success: false,
         message: "Failed to fetch categories. Please try again later.",
@@ -512,7 +550,6 @@ app.get('/active-users', async (req, res) => {
       
       res.json({ activeUsers });
   } catch (error) {
-      console.error('Error getting active users:', error);
       res.status(500).json({ message: 'Failed to get active users' });
   }
 });
@@ -536,7 +573,6 @@ app.get('/login-history/:userId', async (req, res) => {
       
       res.json({ loginHistory });
   } catch (error) {
-      console.error('Error getting login history:', error);
       res.status(500).json({ message: 'Failed to get login history' });
   }
 });
@@ -559,7 +595,6 @@ app.get('/all-login-history', async (req, res) => {
       
       res.json({ allHistory });
   } catch (error) {
-      console.error('Error getting all login history:', error);
       res.status(500).json({ message: 'Failed to get login history' });
   }
 });

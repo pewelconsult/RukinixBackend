@@ -41,7 +41,6 @@ async function addCompany(data) {
     const collectionName = "CLIENTS";
     const collectionRef = db.collection(collectionName);
     data.createOn = new Date();
-    data.createdBy = 'Newton Kumi';
     await collectionRef.add(data);
     return true;
 }
@@ -64,11 +63,9 @@ async function updateCompany(data) {
           return false;
       }
       data.updatedAt = new Date();
-      data.createdBy = "NEWTON"
       await companyDoc.update(data);
       return true;
   } catch (error) {
-      console.error('Error in updateCompany:', error);
       throw error;
   }
 }
@@ -93,6 +90,26 @@ async function getCompanyById(id) {
 }
 
 
+async function getCompanyByName(name) {
+  const collectionName = 'CLIENTS';
+  const companiesRef = db.collection(collectionName);
+  const snapshot = await companiesRef.get();
+  
+  if (snapshot.empty) {
+    throw new Error('No companies found');
+  }
+  const matchingDocs = snapshot.docs.filter(doc => 
+    doc.data().companyName === name
+  );
+  
+  if (matchingDocs.length === 0) {
+    throw new Error('Company not found');
+  }
+  
+  const doc = matchingDocs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
 // Delete company function
 async function deleteCompany(companyId) {
   const collectionName = "CLIENTS";
@@ -109,7 +126,6 @@ async function deleteCompany(companyId) {
       await docRef.delete();
       return true;
   } catch (error) {
-      console.error('Error deleting company:', error);
       throw error;
   }
 }
@@ -121,7 +137,6 @@ async function addUser(data) {
     const collectionName = `/USERS`;
     const collectionRef = db.collection(collectionName);
     data.createOn = new Date();
-    data.createdBy = 'Newton';
     await collectionRef.add(data);
     return true;
 }
@@ -146,7 +161,6 @@ async function getAllUsers() {
 
       return users; // Return the array of users
   } catch (error) {
-      console.error("Error fetching users:", error);
       throw new Error("Could not retrieve users.");
   }
 }
@@ -160,7 +174,76 @@ async function addCategory(data, companyId) {
       await db.collection(collectionPath).add(data);
       return true;
     } catch (error) {
-      console.error("Error adding category:", error);
+      throw error;
+    }
+  }
+
+  async function addOrder(data, companyId) {
+    const collectionPath = `${companyId}/ORDERS/data`;
+    try {
+      data.createOn = new Date();
+      await db.collection(collectionPath).add(data);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  async function addSupplier(data, companyId) {
+    const collectionPath = `${companyId}/SUPPLIERS/data`;
+    try {
+      data.createOn = new Date();
+      await db.collection(collectionPath).add(data);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+
+  async function getAllSuppliers(companyId) {
+    const collectionPath = `${companyId}/SUPPLIERS/data`;
+    try {
+        const suppliersSnapshot = await db.collection(collectionPath)
+            .orderBy('createOn', 'desc')
+            .get();
+        
+        const suppliers = [];
+        suppliersSnapshot.forEach(doc => {
+            suppliers.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return suppliers;
+    } catch (error) {
+        throw error;
+    }
+}
+
+
+
+  async function addDebtor(data, companyId) {
+    const collectionPath = `${companyId}/DEBTORS/data`;
+    try {
+      data.createOn = new Date();
+      await db.collection(collectionPath).add(data);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async function addReturns(data, companyId) {
+    const collectionPath = `${companyId}/RETURNS/data`;
+    try {
+      data.createOn = new Date();
+      await db.collection(collectionPath).add(data);
+      return true;
+    } catch (error) {
       throw error;
     }
   }
@@ -172,7 +255,6 @@ async function addCategory(data, companyId) {
       await db.collection(collectionPath).add(data);
       return true;
     } catch (error) {
-      console.error("Error adding category:", error);
       throw error;
     }
   }
@@ -206,7 +288,6 @@ async function updateProduct(company, productId, data) {
     });
     return true;
   } catch (error) {
-    console.error("Error updating product:", error);
     throw error;
   }
 }
@@ -219,7 +300,6 @@ async function deleteProduct(company, productId) {
     await db.collection(collectionPath).doc(productId).delete();
     return true;
   } catch (error) {
-    console.error("Error deleting product:", error);
     throw error;
   }
 }
@@ -258,7 +338,6 @@ async function deleteProduct(company, productId) {
       await db.collection(collectionPath).add(data);
       return true;
     } catch (error) {
-      console.error("Error adding category:", error);
       throw error;
     }
   }
@@ -313,7 +392,6 @@ async function updateProductQuantities(items, companyId) {
     return true;
 
   } catch (error) {
-    console.error("Error updating product quantities:", error);
     throw error;
   }
 }
@@ -329,7 +407,6 @@ async function processAndAddSale(saleData, companyId) {
     return saleResult;
 
   } catch (error) {
-    console.error("Error processing sale:", error);
     throw error;
   }
 }
@@ -366,7 +443,6 @@ async function getAllSales(company, startDate = null, endDate = null) {
     return sales;
 
   } catch (error) {
-    console.error("Error getting sales:", error);
     throw error;
   }
 }
@@ -391,7 +467,6 @@ async function addUserSessionData(data) {
       return categories;
   
     } catch (error) {
-      console.error("Error fetching categories:", error);
       throw error;
     }
   }
@@ -408,7 +483,6 @@ async function addUserSessionData(data) {
       return categories;
   
     } catch (error) {
-      console.error("Error fetching categories:", error);
       throw error;
     }
   }
@@ -476,6 +550,9 @@ module.exports = {
     checkCategoryAlreadyExist,
     checkProductAlreadyExists,
     deleteProduct,
-    updateProduct
+    updateProduct,
+    addSupplier,
+    getAllSuppliers,
+    getCompanyByName
 };
 
