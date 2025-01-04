@@ -396,7 +396,7 @@ async function updateProductQuantities(items, companyId) {
   }
 }
 
-// Sales route implementation
+
 async function processAndAddSale(saleData, companyId) {
   try {
     // First update product quantities
@@ -446,6 +446,68 @@ async function getAllSales(company, startDate = null, endDate = null) {
     throw error;
   }
 }
+
+
+
+
+async function getSaleById(companyId, saleId) {
+  const saleDoc = await db.collection(`${companyId}/SALES/data`).doc(saleId).get();
+  if (!saleDoc.exists) {
+    throw new Error('Sale not found');
+  }
+  return saleDoc;
+}
+
+// Function to restore product quantity for a single item
+async function restoreProductQuantity(item, companyId) {
+  const productsRef = db.collection(`${companyId}/PRODUCTS/data`);
+
+  const productDoc = await productsRef.doc(item.id).get();
+  if (!productDoc.exists) {
+    throw new Error(`Product not found: ${item.itemName}`);
+  }
+
+  const currentQuantity = productDoc.data().quantity || 0;
+  const newQuantity = currentQuantity + item.quantity;
+
+  // Update the product quantity
+  await productDoc.ref.update({ quantity: newQuantity });
+  return true;
+}
+
+// Function to delete an item from a sale
+async function deleteSaleItem(companyId, saleId, productId) {
+  const saleDoc = await getSaleById(companyId, saleId);
+  const saleData = saleDoc.data();
+
+  // Find the item to delete
+  const itemIndex = saleData.items.findIndex(item => item.id === productId);
+  if (itemIndex === -1) {
+    throw new Error('Item not found in the sale');
+  }
+
+  const deletedItem = saleData.items[itemIndex];
+
+  // Restore the product quantity
+  await restoreProductQuantity(deletedItem, companyId);
+
+  // Remove the item from the sale
+  saleData.items.splice(itemIndex, 1);
+
+  // Update the sale in the database
+  if (saleData.items.length > 0) {
+    // If there are still items in the sale, update the sale
+    await saleDoc.ref.update({ items: saleData.items });
+  } else {
+    // If no items are left, delete the entire sale
+    await saleDoc.ref.delete();
+  }
+
+  return true;
+}
+
+
+
 
 
 
@@ -553,6 +615,8 @@ module.exports = {
     updateProduct,
     addSupplier,
     getAllSuppliers,
-    getCompanyByName
+    getCompanyByName,
+    getSaleById,
+    deleteSaleItem
 };
 

@@ -4,7 +4,7 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   getAllProducts, getAllCompanies, getCompanyById, deleteCompany, updateCompany, addUserSessionData,
   getUserLoginHistory, getAllUsers, processAndAddSale, getAllSales, checkCategoryAlreadyExist,
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
-  getCompanyByName, } = require('./database');
+  getCompanyByName, deleteSaleItem} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -321,6 +321,7 @@ app.post('/make-sales', authenticateUser, async (req, res) => {
 
 
 
+
 // Express route for getting sales
 app.get('/sales', authenticateUser, async (req, res) => {
   try {
@@ -356,6 +357,32 @@ app.get('/sales', authenticateUser, async (req, res) => {
     });
   }
 });
+
+
+
+
+app.delete('/delete-sale/:saleId/:productId', authenticateUser, async (req, res) => {
+  try {
+    const { saleId, productId } = req.params;
+    const companyId = req.user.companyId;
+
+    // Delete the item from the sale
+    await deleteSaleItem(companyId, saleId, productId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Item deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'An error occurred while deleting the item'
+    });
+  }
+});
+
 
 
 
