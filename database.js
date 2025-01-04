@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 require('dotenv').config();
 const { v4: uuidv4 } = require('uuid');
+const { Timestamp } = require('firebase-admin/firestore');
 
 
 // Initialize Firebase Admin SDK
@@ -178,6 +179,18 @@ async function addCategory(data, companyId) {
     }
   }
 
+
+  async function addExpense(data, companyId) {
+    const collectionPath = `${companyId}/EXPENSES/data`; // Define the collection path
+    try {
+      data.createdAt = new Date(); // Add a timestamp
+      await db.collection(collectionPath).add(data); // Add the expense to Firestore
+      return true;
+    } catch (error) {
+      throw error; // Throw the error to be handled by the route
+    }
+  }
+
   async function addOrder(data, companyId) {
     const collectionPath = `${companyId}/ORDERS/data`;
     try {
@@ -225,17 +238,6 @@ async function addCategory(data, companyId) {
 }
 
 
-
-  async function addDebtor(data, companyId) {
-    const collectionPath = `${companyId}/DEBTORS/data`;
-    try {
-      data.createOn = new Date();
-      await db.collection(collectionPath).add(data);
-      return true;
-    } catch (error) {
-      throw error;
-    }
-  }
 
   async function addReturns(data, companyId) {
     const collectionPath = `${companyId}/RETURNS/data`;
@@ -590,6 +592,112 @@ const getUserLoginHistory = async (userId) => {
   return snapshot.docs.map(doc => doc.data());
 };
 
+
+
+async function getExpensesByDateRange(companyId, startDate, endDate) {
+  const collectionPath = `${companyId}/EXPENSES/data`; // Define the collection path
+
+  try {
+    // Query Firestore for expenses within the date range
+    const snapshot = await db.collection(collectionPath)
+      .where('createdAt', '>=', startDate) // Filter by start date
+      .where('createdAt', '<=', endDate) // Filter by end date
+      .get();
+
+    // Map the snapshot documents to an array of expenses
+    const expenses = [];
+    snapshot.forEach(doc => {
+      expenses.push({
+        id: doc.id, // Include the document ID
+        ...doc.data() // Include all other expense data
+      });
+    });
+
+    return expenses;
+
+  } catch (error) {
+    throw error; // Throw the error to be handled by the route
+  }
+}
+
+
+async function addDebtor(data) {
+  const collectionPath = `${data.companyId}/DEBTORS/data`; // Define Firestore collection path
+  try {
+    await db.collection(collectionPath).add(data); // Add debtor to Firestore
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+// Function to fetch all debtors from Firestore
+async function getAllDebtors(companyId) {
+  const collectionPath = `${companyId}/DEBTORS/data`; // Define Firestore collection path
+  try {
+    const snapshot = await db.collection(collectionPath).get(); // Fetch all documents
+    const debtors = [];
+    snapshot.forEach(doc => {
+      debtors.push({
+        id: doc.id, // Include the document ID
+        ...doc.data() // Include all other fields
+      });
+    });
+    return debtors;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+// Function to update a debtor in Firestore
+async function updateDebtor(companyId, debtorId, updateData) {
+  const collectionPath = `${companyId}/DEBTORS/data`; // Define Firestore collection path
+  try {
+    const docRef = db.collection(collectionPath).doc(debtorId); // Get the document reference
+    await docRef.update(updateData); // Update the document
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+// Function to add an asset to Firestore
+async function addAsset(data) {
+  const collectionPath = `${data.companyId}/ASSETS/data`; // Define Firestore collection path
+  try {
+    await db.collection(collectionPath).add(data); // Add asset to Firestore
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+
+// Function to fetch all assets from Firestore
+async function getAllAssets(companyId) {
+  const collectionPath = `${companyId}/ASSETS/data`; // Define Firestore collection path
+  try {
+    const snapshot = await db.collection(collectionPath).get(); // Fetch all documents
+    const assets = [];
+    snapshot.forEach(doc => {
+      assets.push({
+        id: doc.id, // Include the document ID
+        ...doc.data() // Include all other fields
+      });
+    });
+    return assets;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+
+
   // Exporting functions
 module.exports = {
     addCompany,
@@ -617,6 +725,13 @@ module.exports = {
     getAllSuppliers,
     getCompanyByName,
     getSaleById,
-    deleteSaleItem
+    deleteSaleItem,
+    addExpense,
+    getExpensesByDateRange,
+    addDebtor,
+    getAllDebtors,
+    updateDebtor,
+    addAsset,
+    getAllAssets
 };
 

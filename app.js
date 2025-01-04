@@ -4,7 +4,8 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   getAllProducts, getAllCompanies, getCompanyById, deleteCompany, updateCompany, addUserSessionData,
   getUserLoginHistory, getAllUsers, processAndAddSale, getAllSales, checkCategoryAlreadyExist,
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
-  getCompanyByName, deleteSaleItem} = require('./database');
+  getCompanyByName, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor, getAllDebtors,
+  updateDebtor, addAsset, getAllAssets} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -13,6 +14,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid'); 
 const bodyParser = require('body-parser');
 require('dotenv').config();
+const { Timestamp } = require('firebase-admin/firestore');
 
 
 
@@ -231,6 +233,29 @@ app.post('/add-category', authenticateUser, async (req, res) => {
   }
 });
 
+
+app.post('/add-expense', authenticateUser, async (req, res) => {
+  try {
+    const expenseData = req.body; // Get the expense data from the request body
+    const companyId = req.user.companyId; // Get the company ID from the authenticated user
+    expenseData.createdBy = req.user.email
+    // Add the expense to the database
+    await addExpense(expenseData, companyId);
+
+    res.status(201).json({
+      success: true,
+      message: 'Expense added successfully',
+      expense: expenseData
+    });
+
+  } catch (error) {
+    console.error('Error adding expense:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while adding the expense'
+    });
+  }
+});
 
 
 
@@ -563,6 +588,82 @@ app.get('/suppliers', authenticateUser, async (req, res) => {
 
 
 
+// Add Debtor Route
+app.post('/add-debtor', authenticateUser, async (req, res) => {
+  try {
+    const { debtorName, amountDue, dateDue, contactNumber, notes } = req.body;
+    const companyId = req.user.companyId; // Get company ID from authenticated user
+
+    // Convert dateDue to a Firestore Timestamp
+    const dueDate = new Date(dateDue); // Convert string to Date object
+    if (isNaN(dueDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid due date format'
+      });
+    }
+
+    // Create debtor object
+    const newDebtor = {
+      debtorName,
+      amountDue,
+      dueDate: Timestamp.fromDate(dueDate), // Convert Date to Firestore Timestamp
+      contactNumber,
+      notes: notes || '', // Optional field
+      createdAt: Timestamp.now(), // Use Firestore Timestamp for createdAt
+      companyId
+    };
+
+    // Save debtor to Firestore using the addDebtor function
+    newDebtor.amountPaid = 0;
+    await addDebtor(newDebtor);
+
+    res.status(201).json({
+      success: true,
+      message: 'Debtor added successfully',
+      debtor: newDebtor
+    });
+
+  } catch (error) {
+    console.error('Error adding debtor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while adding the debtor'
+    });
+  }
+});
+
+
+
+app.get('/get-expenses', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId; // Get the company ID from the authenticated user
+    const startDate = req.query.startDate; // Get the start date from query parameters
+    const endDate = req.query.endDate; // Get the end date from query parameters
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both startDate and endDate are required'
+      });
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const expenses = await getExpensesByDateRange(companyId, start, end);
+    res.status(200).json({
+      success: true,
+      message: 'Expenses fetched successfully',
+      expenses: expenses
+    });
+
+  } catch (error) {
+    console.error('Error fetching expenses:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching expenses'
+    });
+  }
+});
+
 
 app.get("/products", authenticateUser, async (req, res) => {
     try {
@@ -581,7 +682,112 @@ app.get("/products", authenticateUser, async (req, res) => {
   });
 
 
+
+  app.get('/get-debtors', authenticateUser, async (req, res) => {
+    try {
+      const companyId = req.user.companyId; // Get company ID from authenticated user
   
+      // Fetch all debtors for the company
+      const debtors = await getAllDebtors(companyId);
+  
+      res.status(200).json({
+        success: true,
+        message: 'Debtors fetched successfully',
+        debtors
+      });
+  
+    } catch (error) {
+      console.error('Error fetching debtors:', error);
+      res.status(500).json({
+        success: false,
+        message: 'An error occurred while fetching debtors'
+      });
+    }
+  });
+
+
+// Update Debtor Route
+app.post('/update-debtor', authenticateUser, async (req, res) => {
+  try {
+    const { id, amountPaid, amountDue } = req.body;
+    const companyId = req.user.companyId; // Get company ID from authenticated user
+
+    // Call the database function to update the debtor
+    await updateDebtor(companyId, id, { amountPaid, amountDue });
+
+    res.status(200).json({
+      success: true,
+      message: 'Debtor updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating debtor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while updating the debtor'
+    });
+  }
+});
+
+
+
+// Add Asset Route
+app.post('/add-asset', authenticateUser, async (req, res) => {
+  try {
+    const { name, description, assetNumber, purchasePrice, estimatedLife, assetType } = req.body;
+    const companyId = req.user.companyId; // Get company ID from authenticated user
+
+    // Create asset object
+    const newAsset = {
+      name,
+      description,
+      assetNumber,
+      purchasePrice,
+      estimatedLife,
+      assetType,
+      createdAt: new Date(),
+      companyId
+    };
+
+    // Save asset to Firestore
+    await addAsset(newAsset);
+
+    res.status(201).json({
+      success: true,
+      message: 'Asset added successfully',
+      asset: newAsset
+    });
+
+  } catch (error) {
+    console.error('Error adding asset:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while adding the asset'
+    });
+  }
+});
+
+
+// Get All Assets Route
+app.get('/get-assets', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId; 
+    const assets = await getAllAssets(companyId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Assets fetched successfully',
+      assets
+    });
+
+  } catch (error) {
+    console.error('Error fetching assets:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching assets'
+    });
+  }
+});
 
   // Get all active users
   /*
