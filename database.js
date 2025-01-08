@@ -639,10 +639,14 @@ async function getAllDebtors(companyId) {
     const snapshot = await db.collection(collectionPath).get(); // Fetch all documents
     const debtors = [];
     snapshot.forEach(doc => {
-      debtors.push({
-        id: doc.id, // Include the document ID
-        ...doc.data() // Include all other fields
-      });
+      const debtorData = doc.data();
+      // Check if amountDue > amountPaid
+      if (debtorData.amountDue > debtorData.amountPaid) {
+        debtors.push({
+          id: doc.id, // Include the document ID
+          ...debtorData // Include all other fields
+        });
+      }
     });
     return debtors;
   } catch (error) {
