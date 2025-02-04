@@ -566,7 +566,6 @@ app.get("/categories", authenticateUser, async (req, res) => {
 
 // Add a new purchase
 app.post('/add-purchase', authenticateUser, async (req, res) => {
-  console.log("This route called")
   try {
       const companyId = req.user.companyId;
       const purchaseData = {
@@ -575,11 +574,11 @@ app.post('/add-purchase', authenticateUser, async (req, res) => {
           createdOn: new Date()
       };
 
-      console.log(purchaseData)
+      
       // Add purchase and update product quantity
       await addPurchase(purchaseData, companyId);
       
-      //console.log(purchaseData)
+  
       // Update product quantity
       await updateProductQuantity(
           companyId, 
