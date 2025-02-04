@@ -250,16 +250,24 @@ async function addCategory(data, companyId) {
     }
   }
 
+  
   async function addProduct(data, company) {
     const collectionPath = `${company}/PRODUCTS/data`;
     try {
-      data.createOn = new Date();
-      await db.collection(collectionPath).add(data);
-      return true;
+        data.createOn = new Date();
+        const docRef = await db.collection(collectionPath).add(data);
+        // Return both the ID and the data
+        return {
+            success: true,
+            data: {
+                id: docRef.id,
+                ...data
+            }
+        };
     } catch (error) {
-      throw error;
+        throw error;
     }
-  }
+}
 
 
 
@@ -308,6 +316,109 @@ async function deleteProduct(company, productId) {
 
 
 
+
+// Add a new purchase
+async function addPurchase(data, company) {
+  const purchasesPath = `${company}/PURCHASES/data`;
+  try {
+      // Add the purchase record
+      await db.collection(purchasesPath).add(data);
+      return true;
+  } catch (error) {
+      throw error;
+  }
+}
+
+// Update product quantity after purchase
+async function updateProductQuantity(company, productId, quantityToAdd) {
+  const productsPath = `${company}/PRODUCTS/data`;
+  try {
+      // Get current product data
+      const productDoc = await db.collection(productsPath).doc(productId).get();
+      if (!productDoc.exists) {
+          throw new Error('Product not found');
+      }
+
+      const currentProduct = productDoc.data();
+      const newQuantity = (currentProduct.quantity || 0) + quantityToAdd;
+
+      // Update the product
+      await db.collection(productsPath).doc(productId).update({
+          quantity: newQuantity,
+          updatedOn: new Date()
+      });
+
+      return true;
+  } catch (error) {
+      throw error;
+  }
+}
+
+// Get all purchases
+async function getPurchases(company) {
+  const purchasesPath = `${company}/PURCHASES/data`;
+  const productsPath = `${company}/PRODUCTS/data`;
+  
+  try {
+      const purchasesSnapshot = await db.collection(purchasesPath)
+          .orderBy('purchaseDate', 'desc')
+          .get();
+
+      // Get all products to map their names
+      const productsSnapshot = await db.collection(productsPath).get();
+      const productsMap = new Map();
+      productsSnapshot.forEach(doc => {
+          productsMap.set(doc.id, doc.data());
+      });
+
+      const purchases = [];
+      purchasesSnapshot.forEach(doc => {
+          const purchaseData = doc.data();
+          const product = productsMap.get(purchaseData.productId);
+          
+          purchases.push({
+              id: doc.id,
+              ...purchaseData,
+              productName: product ? product.itemName : 'Unknown Product',
+              category: product ? product.category : 'Unknown Category',
+              brand: product ? product.brand : 'Unknown Brand'
+          });
+      });
+
+      return purchases;
+  } catch (error) {
+      throw error;
+  }
+}
+
+
+
+// Backend function to get purchases by date range
+async function getPurchasesByDateRange(company, startDate, endDate) {
+  const purchasesPath = `${company}/PURCHASES/data`;
+  try {
+    let query = db.collection(purchasesPath);
+    
+    if (startDate && endDate) {
+      query = query.where('purchaseDate', '>=', startDate)
+                  .where('purchaseDate', '<=', endDate);
+    }
+    
+    const snapshot = await query.get();
+    const purchases = [];
+    
+    snapshot.forEach(doc => {
+      purchases.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+
+    return purchases;
+  } catch (error) {
+    throw error;
+  }
+}
 
 
   async function checkCategoryAlreadyExist(companyId, categoryName) {
@@ -450,6 +561,47 @@ async function getAllSales(company, startDate = null, endDate = null) {
 }
 
 
+
+// In database.js
+async function editSaleItem(companyId, saleId, productId, newPrice, quantity) {
+  const saleDoc = await getSaleById(companyId, saleId);
+  const saleData = saleDoc.data();
+
+  const itemIndex = saleData.items.findIndex(item => item.id === productId);
+  if (itemIndex === -1) {
+    throw new Error('Item not found in sale');
+  }
+
+  const oldQuantity = saleData.items[itemIndex].quantity;
+  const quantityDiff = quantity - oldQuantity;
+
+  // Update product stock
+  const productsRef = db.collection(`${companyId}/PRODUCTS/data`);
+  const productDoc = await productsRef.doc(productId).get();
+  
+  if (!productDoc.exists) {
+    throw new Error('Product not found');
+  }
+
+  const currentStock = productDoc.data().quantity;
+  if (quantityDiff > currentStock) {
+    throw new Error('Insufficient stock');
+  }
+
+  // Update sale item
+  saleData.items[itemIndex].sellingPrice = newPrice;
+  saleData.items[itemIndex].quantity = quantity;
+
+  // Update stock
+  await productDoc.ref.update({
+    quantity: currentStock - quantityDiff
+  });
+
+  // Update sale
+  await saleDoc.ref.update({ items: saleData.items });
+
+  return true;
+}
 
 
 async function getSaleById(companyId, saleId) {
@@ -704,38 +856,13 @@ async function getAllAssets(companyId) {
 
   // Exporting functions
 module.exports = {
-    addCompany,
-    addUser,
-    addCategory,
-    getUserByEmail,
-    getUserById,
-    getAllCategories,
-    addProduct,
-    getAllProducts,
-    getAllCompanies, 
-    getCompanyById,
-    deleteCompany,
-    updateCompany,
-    getUserLoginHistory,
-    addUserSessionData,
-    getAllUsers,
-    processAndAddSale,
-    getAllSales,
-    checkCategoryAlreadyExist,
-    checkProductAlreadyExists,
-    deleteProduct,
-    updateProduct,
-    addSupplier,
-    getAllSuppliers,
-    getCompanyByName,
-    getSaleById,
-    deleteSaleItem,
-    addExpense,
-    getExpensesByDateRange,
-    addDebtor,
-    getAllDebtors,
-    updateDebtor,
-    addAsset,
-    getAllAssets
+    addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCategories,
+    addProduct, getAllProducts, getAllCompanies, getCompanyById, deleteCompany,
+    updateCompany, getUserLoginHistory, addUserSessionData, getAllUsers,
+    processAndAddSale, getAllSales, checkCategoryAlreadyExist, checkProductAlreadyExists,
+    deleteProduct, updateProduct, addSupplier, getAllSuppliers, getCompanyByName,
+    getSaleById, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor,
+    getAllDebtors, updateDebtor, addAsset, getAllAssets, editSaleItem,
+    addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange
 };
 

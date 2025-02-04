@@ -5,7 +5,8 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   getUserLoginHistory, getAllUsers, processAndAddSale, getAllSales, checkCategoryAlreadyExist,
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
   getCompanyByName, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor, getAllDebtors,
-  updateDebtor, addAsset, getAllAssets} = require('./database');
+  updateDebtor, addAsset, getAllAssets, editSaleItem, addPurchase, updateProductQuantity, 
+  getPurchases, getPurchasesByDateRange} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -236,10 +237,10 @@ app.post('/add-category', authenticateUser, async (req, res) => {
 
 app.post('/add-expense', authenticateUser, async (req, res) => {
   try {
-    const expenseData = req.body; // Get the expense data from the request body
-    const companyId = req.user.companyId; // Get the company ID from the authenticated user
+    const expenseData = req.body; 
+    const companyId = req.user.companyId;
     expenseData.createdBy = req.user.email
-    // Add the expense to the database
+    
     await addExpense(expenseData, companyId);
 
     res.status(201).json({
@@ -385,6 +386,27 @@ app.get('/sales', authenticateUser, async (req, res) => {
 
 
 
+app.put('/edit-sale', authenticateUser, async (req, res) => {
+  try {
+    const { saleId, productId, newPrice, quantity } = req.body;
+    const companyId = req.user.companyId;
+
+    await editSaleItem(companyId, saleId, productId, newPrice, quantity);
+
+    res.status(200).json({
+      success: true,
+      message: 'Sale updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+
+
 
 app.delete('/delete-sale/:saleId/:productId', authenticateUser, async (req, res) => {
   try {
@@ -520,7 +542,7 @@ app.get("/categories", authenticateUser, async (req, res) => {
   });
 
 
-app.post('/add-products', authenticateUser, async (req, res) => {
+  app.post('/add-products', authenticateUser, async (req, res) => {
     try {
         const { itemName } = req.body;
         const company = req.user.companyId;
@@ -534,15 +556,72 @@ app.post('/add-products', authenticateUser, async (req, res) => {
             createdBy: req.user.email
         };
         
-        await addProduct(productData, company);
-        res.status(201).json(productData);
+        const result = await addProduct(productData, company);
+        // Return the result which includes both id and data
+        res.status(201).json(result);
     } catch (error) {
         res.status(500).json({ error: 'Failed to create product' });
     }
 });
 
+// Add a new purchase
+app.post('/add-purchase', authenticateUser, async (req, res) => {
+  console.log("This route called")
+  try {
+      const companyId = req.user.companyId;
+      const purchaseData = {
+          ...req.body,
+          createdBy: req.user.email,
+          createdOn: new Date()
+      };
 
+      console.log(purchaseData)
+      // Add purchase and update product quantity
+      await addPurchase(purchaseData, companyId);
+      
+      //console.log(purchaseData)
+      // Update product quantity
+      await updateProductQuantity(
+          companyId, 
+          purchaseData.productId, 
+          purchaseData.quantity
+      );
 
+      res.status(200).json({
+          success: true,
+          message: 'Purchase added successfully'
+      });
+  } catch (error) {
+      res.status(500).json({
+          success: false,
+          message: 'Failed to add purchase',
+          error: error.message
+      });
+  }
+});
+
+// Get all purchases
+// Backend route
+app.get('/purchases', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId;
+    const startDate = req.query.startDate;
+    const endDate = req.query.endDate;
+
+    // Get purchases with date range
+    const purchases = await getPurchasesByDateRange(companyId, startDate, endDate);
+    res.status(200).json({
+      success: true,
+      data: purchases
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch purchases',
+      error: error.message
+    });
+  }
+});
 
 app.post('/add-supplier', authenticateUser, async (req, res) => {
   try {
