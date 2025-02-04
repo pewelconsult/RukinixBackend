@@ -16,7 +16,7 @@ const { v4: uuidv4 } = require('uuid');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 const { Timestamp } = require('firebase-admin/firestore');
-
+const http = require('http');
 
 
 const mySecretKey =  process.env.SECRET_KEY
@@ -937,7 +937,14 @@ app.get('/all-login-history', async (req, res) => {
 
 
 // Start the server
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on live http://localhost:${PORT}`);
+// Create two servers with the same Express app
+const server1 = http.createServer(app);
+const server2 = http.createServer(app);
+
+server1.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});
+
+server2.listen(3001, () => {
+  console.log('Server running on http://localhost:3001');
 });
