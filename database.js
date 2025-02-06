@@ -793,7 +793,7 @@ async function getAllDebtors(companyId) {
     snapshot.forEach(doc => {
       const debtorData = doc.data();
       // Check if amountDue > amountPaid
-      if (debtorData.amountDue > debtorData.amountPaid) {
+      if (debtorData.amountDue > 0) {
         debtors.push({
           id: doc.id, // Include the document ID
           ...debtorData // Include all other fields
