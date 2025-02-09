@@ -6,7 +6,7 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
   getCompanyByName, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor, getAllDebtors,
   updateDebtor, addAsset, getAllAssets, editSaleItem, addPurchase, updateProductQuantity, 
-  getPurchases, getPurchasesByDateRange} = require('./database');
+  getPurchases, getPurchasesByDateRange, addLiability, getLiabilities} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -712,6 +712,84 @@ app.post('/add-debtor', authenticateUser, async (req, res) => {
 });
 
 
+app.post('/add-liability', authenticateUser, async (req, res) => {
+  try {
+    const { liabilityName, amount, supplyDate, dueDate, contactNumber, notes } = req.body;
+    const companyId = req.user.companyId; // Get company ID from authenticated user
+
+    // Convert dates to Firestore Timestamps
+    const dueDateObj = new Date(dueDate);
+    const supplyDateObj = new Date(supplyDate);
+
+    // Validate dates
+    if (isNaN(dueDateObj.getTime()) || isNaN(supplyDateObj.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format'
+      });
+    }
+
+    // Create liability object
+    const newLiability = {
+      liabilityName,
+      amount: Number(amount), // Ensure amount is a number
+      supplyDate: Timestamp.fromDate(supplyDateObj),
+      dueDate: Timestamp.fromDate(dueDateObj),
+      contactNumber,
+      notes: notes || '', // Optional field
+      status: dueDateObj < new Date() ? 'Overdue' : 'Pending', // Set initial status
+      amountPaid: 0,
+      createdAt: Timestamp.now(),
+      companyId
+    };
+
+    // Save liability to Firestore using the addLiability function
+    await addLiability(newLiability);
+
+    res.status(201).json({
+      success: true,
+      message: 'Liability added successfully',
+      liability: newLiability
+    });
+
+  } catch (error) {
+    console.error('Error adding liability:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while adding the liability'
+    });
+  }
+});
+
+
+app.get('/get-liabilities', authenticateUser, async (req, res) => {
+  try {
+    const companyId = req.user.companyId; // Get company ID from authenticated user
+    
+    // Get liabilities from Firestore
+    const liabilities = await getLiabilities(companyId);
+    
+    // Convert Firestore Timestamps to ISO strings for frontend
+    const formattedLiabilities = liabilities.map(liability => ({
+      ...liability,
+      dueDate: liability.dueDate.toDate().toISOString(),
+      supplyDate: liability.supplyDate.toDate().toISOString(),
+      createdAt: liability.createdAt.toDate().toISOString()
+    }));
+
+    res.status(200).json({
+      success: true,
+      liabilities: formattedLiabilities
+    });
+
+  } catch (error) {
+    console.error('Error fetching liabilities:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while fetching liabilities'
+    });
+  }
+});
 
 app.get('/get-expenses', authenticateUser, async (req, res) => {
   try {
@@ -760,8 +838,7 @@ app.get("/products", authenticateUser, async (req, res) => {
   });
 
 
-
-  app.get('/get-debtors', authenticateUser, async (req, res) => {
+app.get('/get-debtors', authenticateUser, async (req, res) => {
     try {
       const companyId = req.user.companyId; // Get company ID from authenticated user
   
@@ -784,7 +861,6 @@ app.get("/products", authenticateUser, async (req, res) => {
   });
 
 
-// Update Debtor Route
 app.post('/update-debtor', authenticateUser, async (req, res) => {
   try {
     const { id, amountPaid, amountDue } = req.body;
@@ -806,8 +882,6 @@ app.post('/update-debtor', authenticateUser, async (req, res) => {
     });
   }
 });
-
-
 
 // Add Asset Route
 app.post('/add-asset', authenticateUser, async (req, res) => {

@@ -784,6 +784,39 @@ async function addDebtor(data) {
 }
 
 
+
+async function addLiability(data) {
+  const collectionPath = `${data.companyId}/LIABILITY/data`; // Define Firestore collection path
+  try {
+    await db.collection(collectionPath).add(data); // Add debtor to Firestore
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+async function getLiabilities(companyId) {
+  const collectionPath = `${companyId}/LIABILITY/data`;
+  try {
+    const snapshot = await db.collection(collectionPath).get();
+    const liabilities = [];
+    
+    snapshot.forEach(doc => {
+      liabilities.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    return liabilities;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
+
 // Function to fetch all debtors from Firestore
 async function getAllDebtors(companyId) {
   const collectionPath = `${companyId}/DEBTORS/data`; // Define Firestore collection path
@@ -862,7 +895,7 @@ module.exports = {
     processAndAddSale, getAllSales, checkCategoryAlreadyExist, checkProductAlreadyExists,
     deleteProduct, updateProduct, addSupplier, getAllSuppliers, getCompanyByName,
     getSaleById, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor,
-    getAllDebtors, updateDebtor, addAsset, getAllAssets, editSaleItem,
-    addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange
+    getAllDebtors, updateDebtor, addAsset, getAllAssets, editSaleItem, addLiability,
+    addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange, getLiabilities 
 };
 
