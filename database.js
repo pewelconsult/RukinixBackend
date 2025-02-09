@@ -885,6 +885,32 @@ async function getAllAssets(companyId) {
 }
 
 
+async function updateLiability(companyId, liabilityId, updatedData) {
+  const collectionPath = `${companyId}/LIABILITY/data`;
+  try {
+    const liabilityRef = db.collection(collectionPath).doc(liabilityId);
+    
+    // Get the current liability document
+    const doc = await liabilityRef.get();
+    if (!doc.exists) {
+      throw new Error('Liability not found');
+    }
+
+    // Update the document
+    await liabilityRef.update({
+      amount: updatedData.amount,
+      amountPaid: updatedData.amountPaid,
+      status: updatedData.amount === 0 ? 'Paid' : 'Pending', // Update status based on remaining amount
+      lastUpdated: Timestamp.now()
+    });
+
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
 
 
   // Exporting functions
@@ -896,6 +922,7 @@ module.exports = {
     deleteProduct, updateProduct, addSupplier, getAllSuppliers, getCompanyByName,
     getSaleById, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor,
     getAllDebtors, updateDebtor, addAsset, getAllAssets, editSaleItem, addLiability,
-    addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange, getLiabilities 
+    addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange, getLiabilities,
+    updateLiability 
 };
 

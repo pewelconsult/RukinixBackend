@@ -6,7 +6,7 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
   getCompanyByName, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor, getAllDebtors,
   updateDebtor, addAsset, getAllAssets, editSaleItem, addPurchase, updateProductQuantity, 
-  getPurchases, getPurchasesByDateRange, addLiability, getLiabilities} = require('./database');
+  getPurchases, getPurchasesByDateRange, addLiability, getLiabilities, updateLiability} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -787,6 +787,56 @@ app.get('/get-liabilities', authenticateUser, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'An error occurred while fetching liabilities'
+    });
+  }
+});
+
+
+app.post('/update-liability', authenticateUser, async (req, res) => {
+  try {
+    const { id, amount, amountPaid } = req.body;
+    const companyId = req.user.companyId;
+
+    // Validate the request data
+    if (!id || amount === undefined || amountPaid === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
+      });
+    }
+
+    // Validate amount is not negative
+    if (amount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount cannot be negative'
+      });
+    }
+
+    // Update the liability
+    await updateLiability(companyId, id, {
+      amount,
+      amountPaid
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Liability updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating liability:', error);
+    
+    if (error.message === 'Liability not found') {
+      return res.status(404).json({
+        success: false,
+        message: 'Liability not found'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while updating the liability'
     });
   }
 });
