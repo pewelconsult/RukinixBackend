@@ -6,7 +6,8 @@ const { addCompany, addUser, addCategory, getUserByEmail, getUserById, getAllCat
   checkProductAlreadyExists, deleteProduct, updateProduct, addSupplier, getAllSuppliers, 
   getCompanyByName, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor, getAllDebtors,
   updateDebtor, addAsset, getAllAssets, editSaleItem, addPurchase, updateProductQuantity, 
-  getPurchases, getPurchasesByDateRange, addLiability, getLiabilities, updateLiability} = require('./database');
+  getPurchases, getPurchasesByDateRange, addLiability, getLiabilities, updateLiability, 
+  deletePurchaseAndUpdateQuantity, getPurchaseById} = require('./database');
 const bcrypt = require('bcryptjs');
 const app = express();
 const jwt = require('jsonwebtoken');
@@ -574,17 +575,22 @@ app.post('/add-purchase', authenticateUser, async (req, res) => {
           createdOn: new Date()
       };
 
-      
-      // Add purchase and update product quantity
+      // Add purchase (this already includes the quantity)
       await addPurchase(purchaseData, companyId);
       
-  
-      // Update product quantity
+      // Get the newly added purchase data to verify
+      const purchases = await getPurchases(companyId);
+      const latestPurchase = purchases[0]; // Assuming this is the latest one just added
+      
+      //console.log(latestPurchase)
+      // Update stock based on the recorded purchase
+      /*
       await updateProductQuantity(
-          companyId, 
-          purchaseData.productId, 
-          purchaseData.quantity
+          companyId,
+          purchaseData.productId,
+          latestPurchase.quantity
       );
+      */
 
       res.status(200).json({
           success: true,
@@ -600,7 +606,6 @@ app.post('/add-purchase', authenticateUser, async (req, res) => {
 });
 
 // Get all purchases
-// Backend route
 app.get('/purchases', authenticateUser, async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -621,6 +626,44 @@ app.get('/purchases', authenticateUser, async (req, res) => {
     });
   }
 });
+
+
+// Delete a purchase and update product quantity
+app.delete('/delete-purchase/:id', authenticateUser, async (req, res) => {
+  try {
+      const companyId = req.user.companyId;
+      const purchaseId = req.params.id;
+
+      // Get the purchase details before deletion
+      const purchase = await getPurchaseById(companyId, purchaseId);
+      if (!purchase) {
+          return res.status(404).json({
+              success: false,
+              message: 'Purchase not found'
+          });
+      }
+ 
+      // Delete the purchase and update product quantity
+      await deletePurchaseAndUpdateQuantity(
+          companyId,
+          purchaseId,
+          purchase.productId,
+          purchase.quantity
+      );
+
+      res.status(200).json({
+          success: true,
+          message: 'Purchase deleted successfully'
+      });
+  } catch (error) {
+      res.status(500).json({
+          success: false,
+          message: 'Failed to delete purchase',
+          error: error.message
+      });
+  }
+});
+
 
 app.post('/add-supplier', authenticateUser, async (req, res) => {
   try {

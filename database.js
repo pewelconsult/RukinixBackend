@@ -330,23 +330,29 @@ async function addPurchase(data, company) {
 }
 
 // Update product quantity after purchase
+// In database.js
 async function updateProductQuantity(company, productId, quantityToAdd) {
   const productsPath = `${company}/PRODUCTS/data`;
   try {
-      // Get current product data
-      const productDoc = await db.collection(productsPath).doc(productId).get();
+      const productRef = db.collection(productsPath).doc(productId);
+      const productDoc = await productRef.get();
+
       if (!productDoc.exists) {
-          throw new Error('Product not found');
+          // For new products, set initial quantity
+          await productRef.set({
+              quantity: quantityToAdd,  // Just use the purchase quantity directly
+              updatedOn: new Date()
+          });
+      } else {
+          // For existing products, increment by purchase quantity
+          const currentProduct = productDoc.data();
+          const newQuantity = (currentProduct.quantity || 0) + quantityToAdd;
+          
+          await productRef.update({
+              quantity: newQuantity,
+              updatedOn: new Date()
+          });
       }
-
-      const currentProduct = productDoc.data();
-      const newQuantity = (currentProduct.quantity || 0) + quantityToAdd;
-
-      // Update the product
-      await db.collection(productsPath).doc(productId).update({
-          quantity: newQuantity,
-          updatedOn: new Date()
-      });
 
       return true;
   } catch (error) {
@@ -392,6 +398,58 @@ async function getPurchases(company) {
 }
 
 
+// Get a single purchase by ID
+async function getPurchaseById(company, purchaseId) {
+  const purchasesPath = `${company}/PURCHASES/data`;
+  try {
+      const purchaseDoc = await db.collection(purchasesPath).doc(purchaseId).get();
+      if (!purchaseDoc.exists) {
+          return null;
+      }
+      return {
+          id: purchaseDoc.id,
+          ...purchaseDoc.data()
+      };
+  } catch (error) {
+      throw error;
+  }
+}
+
+// Delete purchase and update product quantity
+async function deletePurchaseAndUpdateQuantity(company, purchaseId, productId, quantity) {
+  const purchasesPath = `${company}/PURCHASES/data`;
+  //const productsPath = `${company}/PRODUCTS/data`;
+
+  try {
+      // Start a Firestore transaction
+      await db.runTransaction(async (transaction) => {
+          // Delete the purchase
+          const purchaseRef = db.collection(purchasesPath).doc(purchaseId);
+          transaction.delete(purchaseRef);
+
+          // Get current product data
+          //const productRef = db.collection(productsPath).doc(productId);
+          //const productDoc = await transaction.get(productRef);
+
+          /*if (!productDoc.exists) {
+              throw new Error('Product not found');
+          }
+
+          const currentProduct = productDoc.data();
+          const newQuantity = Math.max(0, (currentProduct.quantity || 0) - quantity);
+
+          // Update the product quantity
+          transaction.update(productRef, {
+              quantity: newQuantity,
+              updatedOn: new Date()
+          });*/
+      });
+
+      return true;
+  } catch (error) {
+      throw error;
+  }
+}
 
 // Backend function to get purchases by date range
 async function getPurchasesByDateRange(company, startDate, endDate) {
@@ -923,6 +981,6 @@ module.exports = {
     getSaleById, deleteSaleItem, addExpense, getExpensesByDateRange, addDebtor,
     getAllDebtors, updateDebtor, addAsset, getAllAssets, editSaleItem, addLiability,
     addPurchase, updateProductQuantity, getPurchases, getPurchasesByDateRange, getLiabilities,
-    updateLiability 
+    updateLiability, deletePurchaseAndUpdateQuantity, getPurchaseById 
 };
 
