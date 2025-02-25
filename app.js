@@ -579,8 +579,8 @@ app.post('/add-purchase', authenticateUser, async (req, res) => {
       await addPurchase(purchaseData, companyId);
       
       // Get the newly added purchase data to verify
-      const purchases = await getPurchases(companyId);
-      const latestPurchase = purchases[0]; // Assuming this is the latest one just added
+      //const purchases = await getPurchases(companyId);
+      //const latestPurchase = purchases[0]; // Assuming this is the latest one just added
       
       //console.log(latestPurchase)
       // Update stock based on the recorded purchase
