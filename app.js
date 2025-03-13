@@ -605,6 +605,38 @@ app.post('/add-purchase', authenticateUser, async (req, res) => {
   }
 });
 
+
+app.post('/add-purchase2', authenticateUser, async (req, res) => {
+  try {
+      const companyId = req.user.companyId;
+      const purchaseData = {
+          ...req.body,
+          createdBy: req.user.email,
+          createdOn: new Date()
+      };
+      // Add purchase (this already includes the quantity)
+      await addPurchase(purchaseData, companyId);
+      const purchases = await getPurchases(companyId);
+      const latestPurchase = purchases[0];
+      await updateProductQuantity(
+          companyId,
+          purchaseData.productId,
+          latestPurchase.quantity
+      );
+      res.status(200).json({
+          success: true,
+          message: 'Purchase added successfully'
+      });
+  } catch (error) {
+      res.status(500).json({
+          success: false,
+          message: 'Failed to add purchase',
+          error: error.message
+      });
+  }
+});
+
+
 // Get all purchases
 app.get('/purchases', authenticateUser, async (req, res) => {
   try {
