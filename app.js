@@ -615,13 +615,17 @@ app.post('/add-purchase2', authenticateUser, async (req, res) => {
           createdOn: new Date()
       };
       // Add purchase (this already includes the quantity)
+      console.log(purchaseData)
       await addPurchase(purchaseData, companyId);
       const purchases = await getPurchases(companyId);
       const latestPurchase = purchases[0];
+      //console.log(purchases)
+
+      //console.log("This is the latest purchase", latestPurchase)
       await updateProductQuantity(
           companyId,
           purchaseData.productId,
-          latestPurchase.quantity
+          purchaseData.quantity
       );
       res.status(200).json({
           success: true,
